@@ -269,27 +269,27 @@ template<typename T> void BinarySearchTree<T>::inorderPrint() {
 }
 
 
+
 /*                      Range minimum query                    */
 
-template<typename T, typename F = function<T(const T&, const T&)>>
-class RangeMinimumQuery {
+template<typename T, typename F = function<T(const T&, const T&)>> class RangeMinimumQuery {
 private:
     unsigned int len;
     vector<vector<T>> rmq; // vom avea min din secventa ce incepe pe poz i si lungime 2^p
     vector<int> exp; // exponentul celei mai mari puteri de 2 mai mică sau egală cu i
-    F func; // Funcția de reducere (implicit std::gcd)
+    F func; // Funcția de reducere (implicit gcd)
     void constructMatrix();
 
 public:
-    // Constructor implicit folosind std::gcd
+    // Constructor implicit folosind gcd
     RangeMinimumQuery(F f): len(0), func(f) {}
 
     template<typename U, typename G> friend istream& operator>>(istream& in, RangeMinimumQuery<U, G>& rmqObj);
+    template <typename Container> void initializeFromContainer(const Container& container);
     T idempotentQuery(int x, int y);
 };
 
-template<typename T, typename F>
-istream& operator>>(istream& in, RangeMinimumQuery<T, F>& rmqObj) {
+template<typename T, typename F>istream& operator>>(istream& in, RangeMinimumQuery<T, F>& rmqObj) {
     in >> rmqObj.len;
 
     int rows = static_cast<int>(ceil(log(rmqObj.len + 1) / log(2))) + 1;
@@ -308,8 +308,7 @@ istream& operator>>(istream& in, RangeMinimumQuery<T, F>& rmqObj) {
     return in;
 }
 
-template<typename T, typename F>
-void RangeMinimumQuery<T, F>::constructMatrix() {
+template<typename T, typename F> void RangeMinimumQuery<T, F>::constructMatrix() {
     int i, j, poz;
     for (i = 1; (1 << i) <= this->len; i += 1) {
         for (j = 1; j + (1 << i) - 1 <= this->len; j += 1) {
@@ -327,10 +326,268 @@ void RangeMinimumQuery<T, F>::constructMatrix() {
     }
 }
 
-template<typename T, typename F>
-T RangeMinimumQuery<T, F>::idempotentQuery(int x, int y) {
+template<typename T, typename F> T RangeMinimumQuery<T, F>::idempotentQuery(int x, int y) {
     int lin, sar;
     lin = this->exp[y - x + 1];
     sar = (1 << lin);
     return func(this->rmq[lin][x], this->rmq[lin][y - sar + 1]);
+}
+
+template <typename T, typename F> template <typename Container>void RangeMinimumQuery<T, F>::initializeFromContainer(const Container& container) {
+    this->len = container.size();
+
+    int rows = static_cast<int>(ceil(log(this->len + 1) / log(2))) + 1;
+    this->rmq.resize(rows);
+
+    for (auto& row : this->rmq)
+        row.resize(this->len + 1);
+
+    for (unsigned int i = 1; i <= this->len; ++i)
+        this->rmq[0][i] = container[i - 1]; // Indexare de la 1
+
+    this->exp.resize(this->len + 1);
+
+    this->constructMatrix();
+}
+
+/*                     Linked List                                 */
+
+template <typename T>struct Node {
+    T data;
+    Node* next;
+    Node* prev;
+    Node(const T& data) : data(data), next(nullptr), prev(nullptr) {}
+};
+
+template <typename T> class LinkedList {
+private:
+    Node<T>* head;
+    Node<T>* tail;
+    int list_size;
+    Node<T>* merge(Node<T>* left, Node<T>* right);
+    Node<T>* mergeSort(Node<T>* node);
+
+public:
+    LinkedList() : head(nullptr), tail(nullptr), list_size(0) {}
+    ~LinkedList();
+    void push_back(const T& value);
+    void push_front(const T& value);
+    int size() const;
+    int find(const T& value) const;
+    bool remove(const T& value);
+    int remove_all(const T& value);
+    void sort();//merge sort
+    void reverse();
+    void pop_back();
+    void pop_front();
+    T& operator[](int index);
+    void print() const;
+};
+
+
+// Implementation
+
+// Destructor to free memory
+template <typename T>LinkedList<T>::~LinkedList() {
+    Node<T>* current = head;
+    while (current) {
+        Node<T>* next = current->next;
+        delete current;
+        current = next;
+    }
+}
+
+// Adds element at the end of the list
+template <typename T>void LinkedList<T>::push_back(const T& value) {
+    Node<T>* newNode = new Node<T>(value);
+    if (!tail) {
+        head = tail = newNode;
+    } else {
+        tail->next = newNode;
+        newNode->prev = tail;
+        tail = newNode;
+    }
+    list_size++;
+}
+
+// Adds element at the beginning of the list
+template <typename T>void LinkedList<T>::push_front(const T& value) {
+    Node<T>* newNode = new Node<T>(value);
+    if (!head) {
+        head = tail = newNode;
+    } else {
+        newNode->next = head;
+        head->prev = newNode;
+        head = newNode;
+    }
+    list_size++;
+}
+
+// Returns the size of the list
+template <typename T>
+int LinkedList<T>::size() const {
+    return list_size;
+}
+
+// Finds the index of the value (1-based index)
+template <typename T>int LinkedList<T>::find(const T& value) const {
+    Node<T>* current = head;
+    int index = 1;
+    while (current) {
+        if (current->data == value) return index;
+        current = current->next;
+        index++;
+    }
+    return -1; // not found
+}
+
+// Removes the first occurrence of the value
+template <typename T>bool LinkedList<T>::remove(const T& value) {
+    Node<T>* current = head;
+    while (current) {
+        if (current->data == value) {
+            if (current->prev) current->prev->next = current->next;
+            if (current->next) current->next->prev = current->prev;
+            if (current == head) head = current->next;
+            if (current == tail) tail = current->prev;
+            delete current;
+            list_size--;
+            return true;
+        }
+        current = current->next;
+    }
+    return false; // not found
+}
+
+// Removes all occurrences of the value
+template <typename T>int LinkedList<T>::remove_all(const T& value) {
+    Node<T>* current = head;
+    int count = 0;
+    while (current) {
+        if (current->data == value) {
+            Node<T>* toDelete = current;
+            current = current->next;
+            if (toDelete->prev) toDelete->prev->next = toDelete->next;
+            if (toDelete->next) toDelete->next->prev = toDelete->prev;
+            if (toDelete == head) head = toDelete->next;
+            if (toDelete == tail) tail = toDelete->prev;
+            delete toDelete;
+            list_size--;
+            count++;
+        } else {
+            current = current->next;
+        }
+    }
+    return count;
+}
+
+// Helper function for merge sort
+template <typename T>Node<T>* LinkedList<T>::merge(Node<T>* left, Node<T>* right) {
+    if (!left) return right;
+    if (!right) return left;
+
+    if (left->data < right->data) {
+        left->next = merge(left->next, right);
+        left->next->prev = left;
+        left->prev = nullptr;
+        return left;
+    } else {
+        right->next = merge(left, right->next);
+        right->next->prev = right;
+        right->prev = nullptr;
+        return right;
+    }
+}
+
+// Helper function for merge sort
+template <typename T>Node<T>* LinkedList<T>::mergeSort(Node<T>* node) {
+    if (!node || !node->next) return node;
+
+    Node<T>* mid = node;
+    Node<T>* fast = node->next;
+
+    // Find the midpoint
+    while (fast && fast->next) {
+        mid = mid->next;
+        fast = fast->next->next;
+    }
+
+    Node<T>* right = mid->next;
+    mid->next = nullptr;
+    right->prev = nullptr;
+
+    return merge(mergeSort(node), mergeSort(right));
+}
+
+// Sorts the list in ascending order
+template <typename T>void LinkedList<T>::sort() {
+    head = mergeSort(head);
+    // Update tail
+    tail = head;
+    if (tail) {
+        while (tail->next) {
+            tail = tail->next;
+        }
+    }
+}
+
+// Reverses the list
+template <typename T>void LinkedList<T>::reverse() {
+    Node<T>* current = head;
+    Node<T>* prev = nullptr;
+    Node<T>* next = nullptr;
+    while (current) {
+        next = current->next;
+        current->next = prev;
+        current->prev = next;
+        prev = current;
+        current = next;
+    }
+    swap(head, tail);
+}
+
+// Removes the last element
+template <typename T>void LinkedList<T>::pop_back() {
+    if (tail) {
+        Node<T>* toDelete = tail;
+        tail = tail->prev;
+        if (tail) tail->next = nullptr;
+        else head = nullptr;
+        delete toDelete;
+        list_size--;
+    }
+}
+
+// Removes the first element
+template <typename T>void LinkedList<T>::pop_front() {
+    if (head) {
+        Node<T>* toDelete = head;
+        head = head->next;
+        if (head) head->prev = nullptr;
+        else tail = nullptr;
+        delete toDelete;
+        list_size--;
+    }
+}
+
+// Overload subscript operator for accessing elements (1-based index)
+template <typename T>T& LinkedList<T>::operator[](int index) {
+    if (index < 1 || index > list_size) {
+        throw out_of_range("Index out of range");
+    }
+    Node<T>* current = head;
+    for (int i = 1; i < index; ++i) {
+        current = current->next;
+    }
+    return current->data;
+}
+
+// Print the list (for debugging)
+template <typename T>void LinkedList<T>::print() const {
+    Node<T>* current = head;
+    while (current) {
+        cout << current->data << " ";
+        current = current->next;
+    }
+    cout << endl;
 }
